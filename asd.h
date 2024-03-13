@@ -23,9 +23,9 @@ public:
     template<class T>
     auto wrapper(T &&obj) {
         return [this, obj = std::move(obj)]()mutable -> boost::asio::awaitable<void> {
-            auto ret = seq.fetch_add(1);
+            seq++;
             co_await std::move(obj)();
-            ret = seq.fetch_sub(1);
+            auto ret = seq--;
             if (ret == 0) {
                 value.handler();
                 value.handler.~handler_type();
@@ -35,7 +35,7 @@ public:
 
     boost::asio::awaitable<void> waitAll() {
         return boost::asio::async_initiate<decltype(boost::asio::use_awaitable), void()>([this](auto &&a) {
-            auto index = seq.fetch_sub(1);
+            auto index = seq--;
             if (index != 0) {
                 new(&value.handler)handler_type{std::move(a)};
             } else {
