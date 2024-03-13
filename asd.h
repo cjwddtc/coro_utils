@@ -66,6 +66,8 @@ boost::asio::awaitable<T> parrelSpwan(boost::asio::awaitable<T> &&obj,EX &ex){
         if(ptr->is_trigger){
             ptr->ret_handle.handler(std::move(value));
             ptr->ret_handle.handler.~handler_type();
+        }else{
+            new (&ptr->ret_handle.value)T{std::move(value)};
         }
         ptr->is_trigger=true;
         co_return;
@@ -76,6 +78,7 @@ boost::asio::awaitable<T> parrelSpwan(boost::asio::awaitable<T> &&obj,EX &ex){
             ptr->ret_handle.value.~T();
         }else{
             new (&ptr->ret_handle.handler)handler_type{std::move(a)};
+            ptr->is_trigger=true;
         }
     }, boost::asio::use_awaitable);
 }
