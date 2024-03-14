@@ -6,6 +6,45 @@
 #include "boost/asio/use_awaitable.hpp"
 #include "boost/asio/co_spawn.hpp"
 #include "boost/asio/detached.hpp"
+#include <list>
+class AsyncMutx{
+    bool m_is_locked;
+    class LockGuard{
+        AsyncMutx *m_mutex;
+    public:
+        LockGuard(LockGuard &&guard):m_mutex{guard.m_mutex}{
+            guard.m_mutex=0;
+        }
+        LockGuard(AsyncMutx *mutex):m_mutex{mutex}{}
+        ~LockGuard(){
+            if(m_mutex){
+                m_mutex->unlock();
+            }
+        }
+    };
+    using handler_type = boost::asio::async_result<boost::asio::use_awaitable_t<>, void(LockGuard)>::handler_type;
+    std::list<handler_type >m_waiting_list;
+public:
+    boost::asio::awaitable<LockGuard> lock(){
+        return boost::asio::async_initiate<decltype(boost::asio::use_awaitable), void(LockGuard)>([this](auto &&a) {
+            if (m_is_locked) {
+                m_waiting_list.emplace_back(std::move(a));
+            } else {
+                m_is_locked=true;
+                a(LockGuard{this});
+            }
+        }, boost::asio::use_awaitable);
+    }
+    void unlock(){
+        if(!m_waiting_list.empty()){
+            auto a=std::move(m_waiting_list.front());
+            m_waiting_list.pop_front();
+            std::move(a)(LockGuard{this});
+        }else{
+            m_is_locked=false;
+        }
+    }
+};
 class ASD {
     std::atomic<uint64_t> seq{0};
     using handler_type = boost::asio::async_result<boost::asio::use_awaitable_t<>, void()>::handler_type;
@@ -46,6 +85,7 @@ public:
 };
 
 #include <memory>
+
 template <class T,class EX>
 boost::asio::awaitable<T> parrelSpwan(boost::asio::awaitable<T> &&obj,EX &ex){
     using handler_type = typename boost::asio::async_result<boost::asio::use_awaitable_t<>, void(T)>::handler_type;

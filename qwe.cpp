@@ -4,7 +4,9 @@
 
 boost::asio::io_context ctx;
 
+AsyncMutx mutex;
 boost::asio::awaitable<int> qwe() {
+    auto lock=co_await mutex.lock();
     boost::asio::deadline_timer timer{ctx, boost::posix_time::seconds{1}};
     co_await timer.async_wait(boost::asio::use_awaitable);
     printf("qwe\n");
@@ -12,6 +14,7 @@ boost::asio::awaitable<int> qwe() {
 }
 
 boost::asio::awaitable<void> asd() {
+    /*
     {
         boost::asio::deadline_timer timer{ctx, boost::posix_time::seconds{2}};
         auto ret = parrelSpwan(qwe(), ctx);
@@ -27,7 +30,7 @@ boost::asio::awaitable<void> asd() {
         printf("asd\n");
         auto a=co_await std::move(ret);
         printf("result:%d\n",a);
-    }
+    }*/
     {
         ASD a;
         boost::asio::co_spawn(ctx, a.wrapper(qwe), boost::asio::detached);
